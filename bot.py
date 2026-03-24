@@ -1,7 +1,7 @@
 """Conversation state machine for the WhatsApp bot."""
 
 from data import (
-    VENUES, get_venues_by_sport, get_venue_by_id,
+    get_venues_by_sport, get_venue_by_id, get_available_slots,
     create_booking, get_bookings_by_phone, cancel_booking
 )
 from datetime import datetime
@@ -137,8 +137,11 @@ def handle_enter_date(phone: str, msg: str, session: dict) -> str:
     session["date"] = msg
     session["step"] = "select_slot"
 
-    venue = get_venue_by_id(session["venue_id"])
-    slots = venue["slots"]
+    slots = get_available_slots(session["venue_id"], date.strftime("%Y-%m-%d"))
+    if not slots:
+        return "No slots available for that date. Try another date (DD-MM-YYYY):"
+
+    session["slots"] = slots
     slot_list = "\n".join([f"{i+1}️⃣  {s}" for i, s in enumerate(slots)])
 
     return f"🕐 Available slots for {msg}:\n\n{slot_list}\n\nReply with the slot number"
@@ -146,7 +149,7 @@ def handle_enter_date(phone: str, msg: str, session: dict) -> str:
 
 def handle_select_slot(phone: str, msg: str, session: dict) -> str:
     venue = get_venue_by_id(session["venue_id"])
-    slots = venue["slots"]
+    slots = session.get("slots", [])
     try:
         idx = int(msg) - 1
         if idx < 0 or idx >= len(slots):
